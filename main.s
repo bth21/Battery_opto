@@ -1,18 +1,19 @@
 #include <xc.inc>
 
-extrn LCD_Setup, LCD_Write_Message, LCD_Write_Hex, LCD_decimalpoint, LCD_units	 ; external LCD subroutines
-extrn ADC_Setup, ADC_Read	     ; external ADC subroutines
+extrn LCD_Setup, LCD_Write_Message, LCD_Write_Hex, LCD_decimalpoint, LCD_units		;external LCD subroutines
+extrn UART_Setup, UART_Transmit_Message, UART_Transmit_Byte, UART_Write_Hex, UART_decimalpoint, UART_Space	;external UART subroutines
+extrn ADC_Setup, ADC_Read, ADC_Setup2	     ;external ADC subroutines
 extrn Hex_Dec_Setup, Conversion	     ;external Hex to Dec subroutines
 extrn PWM_Setup, PWM_Start	     ;external PWM subroutines
 
-psect udata_acs         ; reserve data space in access ram
-counter:        ds 1    ; reserve one byte for a counter variable
-delay_count:    ds 1    ; reserve one byte for counter in the delay routine
-delay_second:   ds 1    ; reserve one byte for a second delay
-delay_third:    ds 1    ; reserve one byte for a third delay
+psect udata_acs         ;reserve data space in access ram
+counter:        ds 1    ;reserve one byte for a counter variable
+delay_count:    ds 1    ;reserve one byte for counter in the delay routine
+delay_second:   ds 1    ;reserve one byte for a second delay
+delay_third:    ds 1    ;reserve one byte for a third delay
   
-psect udata_bank4       ; reserve data anywhere in RAM (here at 0x400)
-myArray:     ds 0x80    ; reserve 128 bytes for message data
+psect udata_bank4       ;reserve data anywhere in RAM (here at 0x400)
+myArray:     ds 0x80    ;reserve 128 bytes for message data
 psect	data
 	
 		;******** myTable, data in programme memory *******
@@ -28,12 +29,13 @@ rst: org 0x0
 
                 ; ******* Programme FLASH read Setup Code ***********************
 setup:
-    bcf     CFGS	    ; point to Flash program memory 
-    bsf     EEPGD           ; access Flash program memory
-    call    LCD_Setup       ; setup UART
-    call    ADC_Setup       ; setup ADC
-    call    Hex_Dec_Setup   ; setup Hex to Decimal converter
-    call    PWM_Setup	    ; setup PWM
+    bcf     CFGS	    ;point to Flash program memory 
+    bsf     EEPGD           ;access Flash program memory
+    call    LCD_Setup       ;setup LCD
+    call    ADC_Setup       ;setup ADC
+    call    Hex_Dec_Setup   ;setup Hex to Decimal converter
+    call    PWM_Setup	    ;setup PWM
+    call    UART_Setup	    ;setup UART
     goto    Start
    
     
@@ -61,7 +63,7 @@ loop:
     
                 ; ******* Main programme ****************************************
 		
-measure_loop:			;displaying temp value on LCD: 'Temp=XX.XXC'
+measure_loop:			;displaying temp value on LCD + UART: 'Temp=XX.XXC'
   	
     call    ADC_Read		;obtain new temp value in hex
     call    Conversion		;convert hex to decimal
@@ -72,9 +74,55 @@ measure_loop:			;displaying temp value on LCD: 'Temp=XX.XXC'
     movf    ADRESL, W, A	;move low two bytes decimal value into ADRESL
     call    LCD_Write_Hex	;display second two bytes of temp on LCD
     call    LCD_units		;display C on LCD
+    
+    movf    ADRESH, W, A	;move high two bytes decimal value into ADRESH
+    call    UART_Write_Hex	;transmit first two bytes through UART
+    call    UART_decimalpoint	;transmit decimal point
+    movf    ADRESL, W, A	;transmit low two bytes through UART
+    call    UART_Write_Hex	;transmit second two bytes of temp throug UART
+    call    UART_Space		;transmit space to UART to separate two readings
+    
+
     call    PWM_Start
+    
+    call    ADC_Setup2		;setup ADC to obtain voltage readings
+    call    ADC_Read		;obtain voltage readings
+    
+ ;***** this section removes a decimal point from the voltage reading for conversion *****
+ ;***** may not be neccessary *****
+ 
+    ;movlw   0x15
+    ;movwf   ADRESH
+    ;movlw   0x17
+    ;movwf   ADRESL
+    movf    ADRESL, W, A
+    andlw   0xF0		;mask least significant nibble of ADRESL
+    movwf   ADRESL
+    swapf   ADRESL
+    movf    ADRESH, W, A
+    andlw   0x0F
+    swapf   WREG
+    addwf   ADRESL, F
+    movf    ADRESH, W, A
+    andlw   0xF0
+    swapf   WREG
+    movwf   ADRESH
+    
+   ;***** end of section *****
+    
+    call    Conversion		;convert voltage readings to decimal
+    
+    movf    ADRESH, W, A	;move high two bytes decimal value into ADRESH
+    call    UART_Write_Hex	;transmit first two bytes through UART
+    call    UART_decimalpoint	;transmit decimal point
+    movf    ADRESL, W, A	;transmit low two bytes through UART
+    call    UART_Write_Hex	;transmit second two bytes of temp throug UART
+    movlw   0x0A		;set new line in UART
+    call    UART_Transmit_Byte
+    
     call    delay_1		;delay to limit LCD refresh rate
     
+    call    ADC_Setup		;Reset ADC back to temperature readings
     call    LCD_Setup		;Reset LCD
     goto    Start
     goto    measure_loop 
