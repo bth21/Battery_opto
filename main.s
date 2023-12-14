@@ -1,10 +1,10 @@
 #include <xc.inc>
 
 extrn LCD_Setup, LCD_Write_Message, LCD_Write_Hex, LCD_decimalpoint, LCD_units	 ; external LCD subroutines
-extrn ADC_Setup, ADC_Read, ADC_Setup1, ADC_Off	     ; external ADC subroutines
+extrn ADC_Setup, ADC_Read	     ;external ADC subroutines
 extrn Hex_Dec_Setup, Conversion	     ;external Hex to Dec subroutines
 extrn PWM_Setup, PWM_Start	     ;external PWM subroutines
-extrn UART_Setup, UART_Transmit_Message, UART_Write_Hex, UART_Transmit_Byte, UART_decimalpoint, UART_Space
+extrn UART_Setup, UART_Transmit_Message, UART_Write_Hex, UART_Transmit_Byte, UART_decimalpoint, UART_Space  ;external UART subroutines
 
 psect udata_acs         ; reserve data space in access ram
 counter:        ds 1    ; reserve one byte for a counter variable
@@ -35,7 +35,7 @@ setup:
     call    ADC_Setup       ; setup ADC
     call    Hex_Dec_Setup   ; setup Hex to Decimal converter
     call    PWM_Setup	    ; setup PWM
-    call    UART_Setup
+    call    UART_Setup	    ; setup UART
     goto    Start
    
     
@@ -80,12 +80,11 @@ measure_loop:			;displaying temp value on LCD: 'Temp=XX.XXC'
     call    UART_decimalpoint	;display decimal point
     movf    ADRESL, W, A	;move low two bytes decimal value into ADRESL
     call    UART_Write_Hex	;display second two bytes of temp on LCD
-    movlw   0x0A
+    call    PWM_Start		;set PWM duty cycle
+   
+    movlw   0x0A		;set new line in UART
     call    UART_Transmit_Byte
-    call    PWM_Start
-   
-    
-   
+
     call    delay_1		;delay to limit LCD refresh rate
     
     call    LCD_Setup		;Reset LCD
