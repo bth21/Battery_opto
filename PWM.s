@@ -12,7 +12,9 @@ target_low_temp:     ds 1	; reserve 1 byte for the lower temp threshold
 current_temp:	     ds 1	; reserve 1 byte for the current temp value
 heating:	     ds 1	; reserve 1 byte for the heating mode value
 constant1:	     ds 1	; reserve 1 byte for a constant to check heating mode
-    
+low_const:	     ds 1    
+constant2:	     ds 1
+constant3:	     ds 1
     
 psect pwm_code, class=CODE
 
@@ -26,10 +28,14 @@ PWM_Setup:
     movwf   max_PWM_dc
     movlw   0x80		;set reduced PWM duty cycle to 0x80
     movwf   half_PWM_dc
-    movlw   0x30		;set upper temp threshold to 30C
+    movlw   0x28		;set upper temp threshold to 30C
     movwf   upper_lim_temp
-    movlw   0x24		;set lower temp threshold to 25C
+    movlw   0x26		;set lower temp threshold to 25C
     movwf   target_low_temp
+    movlw   0x30
+    movwf   low_const
+    movlw   0x50
+    movwf   constant2
     
    
     movlw   0xFF		;set PWM period to 0xFF
@@ -67,12 +73,16 @@ Update_PWM:
    
  PWM_calc:
  
-    clrf    heating		   ;set heating mode to off
-    movf   half_PWM_dc, W		   ;set PWM duty cycle to reduced value
-    ;movlw   0x05  
-    ;mulwf   current_temp
-   ; movf    PRODL, W
-    ;subwf   max_PWM_dc, W
+    clrf    heating		    ;set heating mode to off
+    movf    half_PWM_dc, W	    ;set PWM duty cycle to reduced value
+    ;movf    current_temp, W	    ;setting reduced PWM to change according to the temperature	
+    ;subwf   constant2, W
+    ;movwf   constant3
+    ;movlw   0x06  ;Var
+    ;mulwf   constant3 ;Var
+    ;movf    PRODL, W ;Var
+    ;movlw   0x68
+    ;subwf   PRODL, W
     
     movwf   CCPR4L
     
@@ -111,6 +121,7 @@ PWM_max:
     movlw   0x02		    ;turn heating mode on
     movwf   heating
   
+    
     movf    max_PWM_dc, W	    ;set PWM duty cycle to maximum
     movwf   CCPR4L
    
